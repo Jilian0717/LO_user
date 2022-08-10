@@ -148,11 +148,11 @@ ax.set_title(exp_name.strip('/'))
 # add the tracks (packed [time, particle])
 # regular spaghetti plots
 #ax.plot(lon[:,1], lat[:,1], '-k', linewidth=.5)
-v = dsr['z'].values
+v = dsr['oxygen'].values
 #ax.scatter(lon[:,1], lat[:,1],c=v[:,1])
 plt.scatter(lon, lat, c=v, cmap='Spectral', s=1, alpha=0.9)
 cbar = plt.colorbar()
-cbar.ax.set_ylabel('Depth (m)')
+cbar.ax.set_ylabel('Oxygen (mmol/m3)')
 ax.plot(lon[0,:], lat[0,:], '.r', alpha=.9, markersize=2.5)
 #ax.plot(lon[-1,:], lat[-1,:], 'or', alpha=.3)
 plt.savefig(exp_name+'_track.png',dpi=300)
