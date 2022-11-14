@@ -14,6 +14,7 @@ from scipy.spatial import cKDTree
 import pickle
 from time import time
 import sys
+from datetime import datetime, timedelta
 
 verbose = False
 
@@ -185,17 +186,36 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
                     
                 if turb == True:
                     AKs0_temp = ds0['AKs'][0,:,:,:].values
+                    # modify top and bottom AKs to be non-negligible
+                    AKs0_temp[0,:,:] = AKs0_temp[1,:,:]
+                    AKs0_temp[-1,:,:] = AKs0_temp[-2,:,:]
                     AKs0 = AKs0_temp.copy()
+                    # 3-point Hanning window to smooth AKs profile 
                     AKs0[1:-1,:,:] = 0.25*AKs0_temp[:-2,:,:] + 0.5*AKs0_temp[1:-1,:,:] + 0.25*AKs0_temp[2:,:,:]
+                    # 4-point Hanning window -jx
+                    #AKs0 = zfun.lowpass(AKs0, n=4, f='hanning', nanpad=False)
                     AKsf0 = AKs0[Maskw3]
-                    #
+                    # modify top and bottom AKs to be non-negligible
                     AKs1_temp = ds1['AKs'][0,:,:,:].values
+                    AKs1_temp[0,:,:] = AKs1_temp[1,:,:]
+                    AKs1_temp[-1,:,:] = AKs1_temp[-2,:,:]
                     AKs1 = AKs1_temp.copy()
+                    # 3-point Hanning window
                     AKs1[1:-1,:,:] = 0.25*AKs1_temp[:-2,:,:] + 0.5*AKs1_temp[1:-1,:,:] + 0.25*AKs1_temp[2:,:,:]
+                    # 4-point Hanning window -jx
+                    #AKs1 = zfun.lowpass(AKs1, n=4, f='hanning', nanpad=False)
                     AKsf1 = AKs1[Maskw3]
                     #
-                    dKdz0 = np.diff(AKs0, axis=0)/dz
-                    dKdz1 = np.diff(AKs1, axis=0)/dz
+                    zeta0 = ds0['zeta'].values #jx
+                    zeta1 = ds1['zeta'].values #jx
+                    zw0 = zrfun.get_z(G['h'], zeta0, S, only_w=True) #jx
+                    zw1 = zrfun.get_z(G['h'], zeta1, S, only_w=True) #jx
+                    dz0 = np.diff(zw0, axis=0) #jx
+                    dz1 = np.diff(zw1, axis=0) #jx
+                    #dKdz0 = np.diff(AKs0, axis=0)/dz
+                    dKdz0 = np.diff(AKs0, axis=0)/dz0 #jx
+                    dKdz1 = np.diff(AKs1, axis=0)/dz1 #jx
+                    #dKdz1 = np.diff(AKs1, axis=0)/dz
                     dKdzf0 = dKdz0[Maskr3]
                     dKdzf1 = dKdz1[Maskr3]
                     
@@ -249,12 +269,22 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
                     AKsf0 = AKsf1.copy()
                     #
                     AKs1_temp = ds1['AKs'][0,:,:,:].values
+                    # modify top and bottom AKs to be non-negligible 
+                    AKs1_temp[0,:,:] = AKs1_temp[1,:,:]
+                    AKs1_temp[-1,:,:] = AKs1_temp[-2,:,:]
                     AKs1 = AKs1_temp.copy()
+                    # 3-point Hanning window
                     AKs1[1:-1,:,:] = 0.25*AKs1_temp[:-2,:,:] + 0.5*AKs1_temp[1:-1,:,:] + 0.25*AKs1_temp[2:,:,:]
+                    # 4-point Hanning window -jx
+                    #AKs1 = zfun.lowpass(AKs1, n=4, f='hanning', nanpad=False)
                     AKsf1 = AKs1[Maskw3]
                     #
                     dKdzf0 = dKdzf1.copy()
-                    dKdz1 = np.diff(AKs1, axis=0)/dz
+                    #dKdz1 = np.diff(AKs1, axis=0)/dz
+                    zeta1 = ds1['zeta'].values #jx
+                    zw1 = zrfun.get_z(G['h'], zeta1, S, only_w=True) #jx
+                    dz1 = np.diff(zw1, axis=0) #jx 
+                    dKdz1 = np.diff(AKs1, axis=0)/dz1
                     dKdzf1 = dKdz1[Maskr3]
             z1 = ds1['zeta'][0,:,:].values
             zf0 = zf1.copy()
