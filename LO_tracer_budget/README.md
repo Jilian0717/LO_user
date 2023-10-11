@@ -7,4 +7,4 @@
   
 - get_TNTempVol_Denitri_AirSeaHeat_1.py:
   
-  calculate TN\*vol, temp\*vol, air-sea heat exchange, and sediment TN loss ( = loss of TN from detritus sinking out of the bottom water column - gain of TN from NH4 generation + loss of TN from denitrification)
+  calculate <ins>TN\*vol</ins>, <ins>temp\*vol</ins>, <ins>air-sea heat exchange</ins>, and <ins>sediment TN loss</ins> ( = loss of TN from detritus sinking out of the bottom water column - gain of TN from NH4 generation + loss of TN from denitrification)
