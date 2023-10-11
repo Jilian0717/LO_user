@@ -3,7 +3,7 @@
 
 - get_DO_bgc_air_sea_1.py:
   
-  calculate <ins>DO production from photosynthesis</ins>, DO consumption from water column remineralization & nitrification and sediment SOD, air-sea O2 exchange, and DO\*vol
+  calculate <ins>DO production</ins> from photosynthesis, <ins>DO consumption</ins> from water column remineralization & nitrification and sediment SOD, <ins>air-sea O2 exchange</ins>, and <ins>DO\*vol</ins>
   
 - get_TNTempVol_Denitri_AirSeaHeat_1.py:
   
