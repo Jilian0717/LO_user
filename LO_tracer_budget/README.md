@@ -1,5 +1,5 @@
 
-#### These two codes are used to calculate budget terms (except for exchange flow terms) for heat/TN/DO in the Salish Sea, run on perigee
+#### These two codes are used to calculate budget terms (except for exchange flow terms) for heat/TN/DO based on hourly history files, run on perigee
 
 - get_DO_bgc_air_sea_1.py:
   
