@@ -23,8 +23,14 @@ G, S, T = zrfun.get_basic_info(in_dir / ('f' + Ldir['ds0']) / 'ocean_his_0002.nc
 fn0 = xr.open_dataset(in_dir / ('f' + Ldir['ds0']) / 'ocean_his_0002.nc')
 dx = 1/fn0.pm.values
 dy = 1/fn0.pn.values
+lonr = fn0.lon_rho.values
+latr = fn0.lat_rho.values
 area = dx * dy
 NX, NY = dx.shape
+
+AttSW = np.zeros((NX, NY)) + 0.05 # m-1
+AttSW[(lonr > -123.89) & (latr < 50.29) & (latr > 47.02)] = 0.15 # in Salish Sea
+AttSW[(lonr > -125.31) & (lonr < -123.89) & (latr < 51.02) & (latr > 49.13)] = 0.15
 
 dt0 = datetime.strptime(ds0, Lfun.ds_fmt)
 dt1 = datetime.strptime(ds1, Lfun.ds_fmt)
@@ -165,7 +171,7 @@ while dt00 <= dt1:  # loop each day and every history file
                 # O2 production from photosynthesis, mmol O2/m3/hr ?
                 # dz = z_w[k+1,:,:] - z_w[k,:,:]
                 # Att[k,:,:] = (AttSW + AttChl*chl[k,:,:] - 0.0065*(salt[k,:,:]-32))*dz
-                Att[k,:,:] = (0.15 + 0.012*chl[k,:,:] - 0.0065*(salt[k,:,:]-32))* (z_w[k+1,:,:] - z_w[k,:,:])
+                Att[k,:,:] = (AttSW + 0.012*chl[k,:,:] - 0.0065*(salt[k,:,:]-32))* (z_w[k+1,:,:] - z_w[k,:,:])
                 #ExpAtt[k,:,:] = np.exp(-Att[k,:,:])
                 #Itop = PAR[k+1,:,:]
                 #PAR[k,:,:] = Itop * (1-ExpAtt[k,:,:])/Att[k,:,:] # average at cell center
