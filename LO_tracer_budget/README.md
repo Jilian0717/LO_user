@@ -4,6 +4,8 @@
 - get_DO_bgc_air_sea_1.py:
   
   calculate <ins>DO production</ins> from photosynthesis, <ins>DO consumption</ins> from water column remineralization & nitrification and sediment SOD, <ins>air-sea O2 exchange</ins>, and <ins>DO\*vol</ins>
+
+  it takes around 3.5 hr to run for 1 month.
   
 - get_TNTempVol_Denitri_AirSeaHeat_1.py:
   
