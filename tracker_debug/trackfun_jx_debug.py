@@ -361,8 +361,7 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
                 plon3, plat3 = update_position_lonlat(dxg, dyg, maskr, V2, delt, plon, plat)
                 ZH2_new = get_zh(zf0,zf1,hf, plon3, plat3, frmid)
                 pcs3 = update_position_z(V2, ZH2, ZH2_new, delt, pcs, surface)
-                
-                
+                                
                 V3 = get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon3, plat3, pcs3, fr1, surface)
                 ZH3 = get_zh(zf0,zf1,hf, plon3, plat3, fr1)
                 
@@ -400,9 +399,7 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
                 #plon, plat, pcs = update_position(dxg, dyg, maskr, (V0 + 2*V1 + 2*V2 + V3)/6 + Vwind3 + Vsink3 + Vstay3, (ZH0 + 2*ZH1 + 2*ZH2 + ZH3)/6, S, delt, plon, plat, pcs, surface)
                 plon, plat = update_position_lonlat(dxg, dyg, maskr, (V0 + 2*V1 + 2*V2 + V3)/6 + Vwind3 + Vsink3 + Vstay3, delt, plon, plat)
                 ZH_new = get_zh(zf0,zf1,hf, plon, plat, fr1)  # use fr1?
-                pcs = update_position_z((V0 + 2*V1 + 2*V2 + V3)/6 + Vwind3 + Vsink3 + Vstay3,
-                                         (ZH0 + 2*ZH1 + 2*ZH2 + ZH3)/6,
-                                         ZH_new, delt, pcs, surface)
+                pcs = update_position_z((V0 + 2*V1 + 2*V2 + V3)/6 + Vwind3 + Vsink3 + Vstay3, ZH0, ZH_new, delt, pcs, surface)
                 
                 
             elif TR['no_advection'] == True:
@@ -427,7 +424,7 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
                 # update vertical position for real
                 #plon_junk, plat_junk, pcs = update_position(dxg, dyg, maskr, Vturb3, ZH, S, delt,
                                                    #  plon, plat, pcs, surface)
-                pcs = update_position_z(Vturb3, ZH, ZH, delt, pcs, surface)  #jx
+                pcs = update_position_z(Vturb3, ZH_new, ZH_new, delt, pcs, surface)  #jx
 
             ihr = nd + 1 # number of fractions 1/ndiv into the hour
             nihr = int(ndiv/TR['sph']) # number of fractions 1/ndiv between saves
@@ -446,7 +443,7 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
                 P['u'][it1,:] = V3[:,0]
                 P['v'][it1,:] = V3[:,1]
                 P['w'][it1,:] = V3[:,2]
-                P['zeta'][it1,:] = ZH3[:,0]
+                P['zeta'][it1,:] = ZH3[:,0]   #should this be ZH3 or ZH_new?  -jx
                 P['h'][it1,:] = ZH3[:,1]
                 P['z'][it1,:] = pcs * ZH3.sum(axis=1) + ZH3[:,0]
         if verbose:
