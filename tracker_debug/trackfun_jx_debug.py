@@ -443,7 +443,7 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
                 P['u'][it1,:] = V3[:,0]
                 P['v'][it1,:] = V3[:,1]
                 P['w'][it1,:] = V3[:,2]
-                P['zeta'][it1,:] = ZH3[:,0]   #should this be ZH3 or ZH_new?  -jx
+                P['zeta'][it1,:] = ZH3[:,0]   #ZH3 and ZH_new are the same?  -jx
                 P['h'][it1,:] = ZH3[:,1]
                 P['z'][it1,:] = pcs * ZH3.sum(axis=1) + ZH3[:,0]
         if verbose:
