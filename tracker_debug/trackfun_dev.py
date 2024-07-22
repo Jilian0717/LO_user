@@ -108,7 +108,7 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
     plist_main = ['lon', 'lat', 'cs', 'ot', 'z'] + vn_list_other
     
     # debugging
-    vconst = True # set v to a constant, u and w to zero
+    vconst = False # set v to a constant, u and w to zero
     jx = True # use Jilian's modification of the pcs step
     average_W = True # average k neighbors of w in get_vel, such as k_nei=20, need this in high-resolution (10m) model
     k_nei = 20

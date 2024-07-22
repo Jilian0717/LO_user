@@ -1,18 +1,14 @@
-# get volume-averaged tracer concentration
+# get volume-weighted tracer concentration
 import xarray as xr
 import matplotlib.pyplot as plt
 import numpy as np
 from lo_tools import zfun, zrfun, Lfun
-import scipy
-import pickle
+import scipy, pickle, sys
 from datetime import datetime, timedelta
 from time import time
-import sys
 import pandas as pd
 
-tt0 = time()
-
-#% load salish sea j,i
+#% load salish sea index
 seg_name = 'seg_info_dict_cas7_c2_noriv.p'
 seg_df = pd.read_pickle(seg_name)
 ji_list = seg_df['sog6_m']['ji_list']
@@ -24,8 +20,8 @@ Ldir = Lfun.Lstart()
 Ldir['roms_out'] = Ldir['roms_out2']
 Ldir['gtagex'] = 'cas7_t0_x4b'
 
-ds0 = '2020.01.01'
-ds1 = '2020.01.01'
+ds0 = '2014.01.01'
+ds1 = '2014.01.31'
 Ldir['ds0'] = ds0
 in_dir = Ldir['roms_out'] / Ldir['gtagex']
 G, S, T = zrfun.get_basic_info(in_dir / ('f' + Ldir['ds0']) / 'ocean_his_0002.nc')
@@ -40,22 +36,23 @@ dt0 = datetime.strptime(ds0, Lfun.ds_fmt)
 dt1 = datetime.strptime(ds1, Lfun.ds_fmt)
 dt00 = dt0
 
+# initialization
 t = []
 TN_all_depth = [] # includes the whole water column
 TN_shallow = [] # shallower than 20m, for example
 TN_deep = [] # deeper than 20m
 TN_surface = [] # surface layer
 TN_bottom = [] # bottom layer
-NO3_all_depth = [] # includes the whole water column
-NO3_shallow = [] # shallower than 20m, for example
-NO3_deep = [] # deeper than 20m
+NO3_all_depth = []
+NO3_shallow = []
+NO3_deep = []
 NO3_surface = [] # surface layer
 NO3_bottom = [] # bottom layer
-NH4_all_depth = [] # includes the whole water column
-NH4_shallow = [] # shallower than 20m, for example
-NH4_deep = [] # deeper than 20m
-NH4_surface = [] # surface layer
-NH4_bottom = [] # bottom layer
+NH4_all_depth = []
+NH4_shallow = []
+NH4_deep = []
+NH4_surface = []
+NH4_bottom = []
 temp_all_depth = []
 temp_shallow = []
 temp_deep = []
@@ -68,13 +65,11 @@ salt_surface = []
 salt_bottom = []
 oxy_all_depth = []
 oxy_shallow = [] 
-oxy_deep = [] 
-oxy_deep2 = [] # bottom 50 m for example
+oxy_deep = []
 oxy_surface = []
 oxy_bottom = []
 
 z0 = -20 # meter
-z2 = 50 # m
 
 while dt00 <= dt1:
     print(dt00)
@@ -84,23 +79,22 @@ while dt00 <= dt1:
     
     for fn in fn_list[0:-1]: 
         ds_his = xr.open_dataset(fn)
-        #print(fn)
-        h = ds_his.h.values      
+        h    = ds_his.h.values
         zeta = ds_his.zeta.values.squeeze()
-        zw = zrfun.get_z(h, zeta, S, only_w=True)
+        zw   = zrfun.get_z(h, zeta, S, only_w=True)
         z_rho = zrfun.get_z(h, zeta, S, only_rho=True)
-        dz = np.diff(zw, axis=0)
+        dz  = np.diff(zw, axis=0)
         vol = dx*dy*dz
         
         z_rho0 = z_rho.copy()
-        z_rho0 = z_rho0 - z_rho0[-1,:,:] # adjust zero to free surface
+        z_rho0 = z_rho0 - z_rho0[-1,:,:] # adjust zero meter to free surface
         
         #-------- TN --------
-        Phyt = ds_his.phytoplankton.values.squeeze()
-        Zoop = ds_his.zooplankton.values.squeeze()
-        NO3 = ds_his.NO3.values.squeeze()
-        NH4 = ds_his.NH4.values.squeeze()
-        LdetN = ds_his.LdetritusN.values.squeeze()  
+        Phyt  = ds_his.phytoplankton.values.squeeze()
+        Zoop  = ds_his.zooplankton.values.squeeze()
+        NO3   = ds_his.NO3.values.squeeze()
+        NH4   = ds_his.NH4.values.squeeze()
+        LdetN = ds_his.LdetritusN.values.squeeze()
         SdetN = ds_his.SdetritusN.values.squeeze() 
         TN = Phyt + Zoop + NO3 + NH4 + LdetN + SdetN             
         # volume weighted TN concentration
@@ -134,51 +128,44 @@ while dt00 <= dt1:
         oxy_surface.append((np.nansum(oxy[-1,jj,ii] * vol[-1,jj,ii])) / (np.nansum(vol[-1,jj,ii])))
         oxy_bottom.append((np.nansum(oxy[0,jj,ii] * vol[0,jj,ii])) / (np.nansum(vol[0,jj,ii])))
        
-        #------
+        #------ shallow and deep: tracer conc * vol --------
         oxy_vol_shallow = np.zeros(len(jj))
-        oxy_vol_deep = np.zeros(len(jj))
-        oxy_vol_deep2 = np.zeros(len(jj))
-        
+        oxy_vol_deep    = np.zeros(len(jj))
         temp_vol_shallow = np.zeros(len(jj))
-        temp_vol_deep = np.zeros(len(jj))
+        temp_vol_deep    = np.zeros(len(jj))
         salt_vol_shallow = np.zeros(len(jj))
-        salt_vol_deep = np.zeros(len(jj))
+        salt_vol_deep    = np.zeros(len(jj))
         TN_vol_shallow = np.zeros(len(jj))
-        TN_vol_deep = np.zeros(len(jj))
+        TN_vol_deep    = np.zeros(len(jj))
         NO3_vol_shallow = np.zeros(len(jj))
-        NO3_vol_deep = np.zeros(len(jj))
+        NO3_vol_deep    = np.zeros(len(jj))
         NH4_vol_shallow = np.zeros(len(jj))
-        NH4_vol_deep = np.zeros(len(jj))
+        NH4_vol_deep    = np.zeros(len(jj))
         
         vol_shallow = np.zeros(len(jj))
-        vol_deep = np.zeros(len(jj))
-        vol_deep2 = np.zeros(len(jj))
+        vol_deep    = np.zeros(len(jj))
         
         for k in range(len(jj)): # loop inside the domain, e.g. Salish Sea
             index_s = np.argwhere(z_rho0[:,jj[k],ii[k]]>z0) # shallow than z0, z_rho0 is negative value
-            oxy_vol_shallow[k] = np.sum(oxy[index_s,jj[k],ii[k]] * vol[index_s,jj[k],ii[k]])
-            TN_vol_shallow[k] = np.sum(TN[index_s,jj[k],ii[k]] * vol[index_s,jj[k],ii[k]])
-            NO3_vol_shallow[k] = np.sum(NO3[index_s,jj[k],ii[k]] * vol[index_s,jj[k],ii[k]])
-            NH4_vol_shallow[k] = np.sum(NH4[index_s,jj[k],ii[k]] * vol[index_s,jj[k],ii[k]])
+            oxy_vol_shallow[k]  = np.sum(oxy[index_s,jj[k],ii[k]] * vol[index_s,jj[k],ii[k]])
+            TN_vol_shallow[k]   = np.sum(TN[index_s,jj[k],ii[k]]  * vol[index_s,jj[k],ii[k]])
+            NO3_vol_shallow[k]  = np.sum(NO3[index_s,jj[k],ii[k]] * vol[index_s,jj[k],ii[k]])
+            NH4_vol_shallow[k]  = np.sum(NH4[index_s,jj[k],ii[k]] * vol[index_s,jj[k],ii[k]])
             temp_vol_shallow[k] = np.sum(temp[index_s,jj[k],ii[k]] * vol[index_s,jj[k],ii[k]])
             salt_vol_shallow[k] = np.sum(salt[index_s,jj[k],ii[k]] * vol[index_s,jj[k],ii[k]])
             vol_shallow[k] = np.sum(vol[index_s,jj[k],ii[k]])
             
             index_d = np.argwhere(z_rho0[:,jj[k],ii[k]]<=z0) # deeper than z0
-            oxy_vol_deep[k] = np.sum(oxy[index_d,jj[k],ii[k]] * vol[index_d,jj[k],ii[k]])
-            TN_vol_deep[k]  = np.sum(TN[index_d,jj[k],ii[k]] * vol[index_d,jj[k],ii[k]])
-            NO3_vol_deep[k] = np.sum(NO3[index_d,jj[k],ii[k]] * vol[index_d,jj[k],ii[k]])
+            oxy_vol_deep[k]  = np.sum(oxy[index_d,jj[k],ii[k]] * vol[index_d,jj[k],ii[k]])
+            TN_vol_deep[k]   = np.sum(TN[index_d,jj[k],ii[k]]  * vol[index_d,jj[k],ii[k]])
+            NO3_vol_deep[k]  = np.sum(NO3[index_d,jj[k],ii[k]] * vol[index_d,jj[k],ii[k]])
             NH4_vol_deep[k]  = np.sum(NH4[index_d,jj[k],ii[k]] * vol[index_d,jj[k],ii[k]])
             temp_vol_deep[k] = np.sum(temp[index_d,jj[k],ii[k]] * vol[index_d,jj[k],ii[k]])
             salt_vol_deep[k] = np.sum(salt[index_d,jj[k],ii[k]] * vol[index_d,jj[k],ii[k]])
             vol_deep[k] = np.sum(vol[index_d,jj[k],ii[k]])
             
-            index_d2 = np.argwhere(z_rho[:,jj[k],ii[k]]+h[jj[k],ii[k]] <= z2) # bottom z2 meter
-            oxy_vol_deep2[k] = np.sum(oxy[index_d2,jj[k],ii[k]] * vol[index_d2,jj[k],ii[k]])
-            vol_deep2[k] = np.sum(vol[index_d2,jj[k],ii[k]])
-        
         oxy_vol_deep[vol_deep==0] = np.nan # no "deep layer" in shallow regions
-        TN_vol_deep[vol_deep==0] = np.nan
+        TN_vol_deep[vol_deep==0]  = np.nan
         NO3_vol_deep[vol_deep==0] = np.nan
         NH4_vol_deep[vol_deep==0] = np.nan
         temp_vol_deep[vol_deep==0] = np.nan
@@ -187,8 +174,6 @@ while dt00 <= dt1:
         
         oxy_shallow.append(np.sum(oxy_vol_shallow)/np.sum(vol_shallow))
         oxy_deep.append(np.nansum(oxy_vol_deep)/np.nansum(vol_deep))
-        oxy_deep2.append(np.nansum(oxy_vol_deep2)/np.nansum(vol_deep2))
-        
         TN_shallow.append(np.sum(TN_vol_shallow)/np.sum(vol_shallow))
         TN_deep.append(np.nansum(TN_vol_deep)/np.nansum(vol_deep))
         NO3_shallow.append(np.sum(NO3_vol_shallow)/np.sum(vol_shallow))
@@ -203,38 +188,38 @@ while dt00 <= dt1:
         t.append(ds_his.ocean_time.values)
         
     dt00 = dt00 + timedelta(days=1)
-    
-dict_tmp = {'t': t, 
-            'TN_all_depth':   TN_all_depth, 
-            'TN_shallow':     TN_shallow,
-            'TN_deep':        TN_deep,
-            'TN_surface':     TN_surface,
-            'TN_bottom':      TN_bottom,
+
+# save
+dict_tmp = {'t': t,
+            'TN_all_depth':    TN_all_depth,
+            'TN_shallow':      TN_shallow,
+            'TN_deep':         TN_deep,
+            'TN_surface':      TN_surface,
+            'TN_bottom':       TN_bottom,
             'NO3_all_depth':   NO3_all_depth,
             'NO3_shallow':     NO3_shallow,
             'NO3_deep':        NO3_deep,
             'NO3_surface':     NO3_surface,
             'NO3_bottom':      NO3_bottom,
-            'NH4_all_depth': NH4_all_depth,
-            'NH4_shallow':   NH4_shallow,
-            'NH4_deep':      NH4_deep,
-            'NH4_surface':   NH4_surface,
-            'NH4_bottom':    NH4_bottom,
-            'temp_all_depth': temp_all_depth,
-            'temp_shallow':   temp_shallow,
-            'temp_deep':      temp_deep,
-            'temp_surface':   temp_surface,
-            'temp_bottom':    temp_bottom,
-            'salt_all_depth': salt_all_depth,
-            'salt_shallow':   salt_shallow,
-            'salt_deep':      salt_deep,
-            'salt_surface':   salt_surface,
-            'salt_bottom':    salt_bottom,
-            'oxy_all_depth':  oxy_all_depth,
-            'oxy_shallow':    oxy_shallow,
-            'oxy_deep':       oxy_deep,
-            'oxy_deep2':      oxy_deep2,
-            'oxy_surface':    oxy_surface,
-            'oxy_bottom':     oxy_bottom,
+            'NH4_all_depth':   NH4_all_depth,
+            'NH4_shallow':     NH4_shallow,
+            'NH4_deep':        NH4_deep,
+            'NH4_surface':     NH4_surface,
+            'NH4_bottom':      NH4_bottom,
+            'temp_all_depth':  temp_all_depth,
+            'temp_shallow':    temp_shallow,
+            'temp_deep':       temp_deep,
+            'temp_surface':    temp_surface,
+            'temp_bottom':     temp_bottom,
+            'salt_all_depth':  salt_all_depth,
+            'salt_shallow':    salt_shallow,
+            'salt_deep':       salt_deep,
+            'salt_surface':    salt_surface,
+            'salt_bottom':     salt_bottom,
+            'oxy_all_depth':   oxy_all_depth,
+            'oxy_shallow':     oxy_shallow,
+            'oxy_deep':        oxy_deep,
+            'oxy_surface':     oxy_surface,
+            'oxy_bottom':      oxy_bottom,
            }
 pickle.dump(dict_tmp, open("vol_weighted_tracer_conc_"+ds0+'_'+Ldir['gtagex']+'.p','wb'))

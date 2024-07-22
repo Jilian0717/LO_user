@@ -1,5 +1,5 @@
 
-#### These two codes are used to calculate budget terms (except for exchange flow terms) for heat/TN/DO based on hourly history files from LiveOcean, run on perigee
+#### These codes are used to calculate budget terms (except for exchange flow terms) for heat/TN/DO based on hourly history files from LiveOcean, run on perigee/apogee
 
 - get_DO_bgc_air_sea_1.py:
   
