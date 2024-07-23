@@ -7,7 +7,6 @@ LO_output/tracks/exp_info.csv.
 """
 # setup (assume path to alpha set by calling code)
 from lo_tools import Lfun, zfun, zrfun
-
 import numpy as np
 import xarray as xr
 from scipy.spatial import cKDTree
@@ -18,7 +17,7 @@ import sys
 verbose = False
 
 # this is the full list of tracers we want to find on the track and write to output
-tracer_list_full = ['salt', 'temp']#, 'oxygen']
+tracer_list_full = ['salt']#, 'oxygen']
 # we trim the list below so that it only includes tracers that are present
 # in the history files
 
@@ -52,14 +51,19 @@ Maskw3 = np.tile(Maskr.reshape(1,G['M'],G['L']),[S['N']+1,1,1])
 tree_dir = Ldir['LOo'] / 'tracker_trees' / TR0['gridname']
 # 2D
 xyT_rho = pickle.load(open(tree_dir / 'xyT_rho.p', 'rb'))
-xyT_u = pickle.load(open(tree_dir / 'xyT_u.p', 'rb'))
-xyT_v = pickle.load(open(tree_dir / 'xyT_v.p', 'rb'))
+xyT_u   = pickle.load(open(tree_dir / 'xyT_u.p', 'rb'))
+xyT_v   = pickle.load(open(tree_dir / 'xyT_v.p', 'rb'))
 xyT_rho_un = pickle.load(open(tree_dir / 'xyT_rho_un.p', 'rb'))
 # 3D
 xyzT_rho = pickle.load(open(tree_dir / 'xyzT_rho.p', 'rb'))
-xyzT_u = pickle.load(open(tree_dir / 'xyzT_u.p', 'rb'))
-xyzT_v = pickle.load(open(tree_dir / 'xyzT_v.p', 'rb'))
-xyzT_w = pickle.load(open(tree_dir / 'xyzT_w.p', 'rb'))
+xyzT_u   = pickle.load(open(tree_dir / 'xyzT_u.p', 'rb'))
+xyzT_v   = pickle.load(open(tree_dir / 'xyzT_v.p', 'rb'))
+xyzT_w   = pickle.load(open(tree_dir / 'xyzT_w.p', 'rb'))
+# 3D in meters #jx
+xyzT_rho_m = pickle.load(open(tree_dir / 'xyzT_rho_m.p', 'rb'))
+xyzT_u_m   = pickle.load(open(tree_dir / 'xyzT_u_m.p', 'rb'))
+xyzT_v_m   = pickle.load(open(tree_dir / 'xyzT_v_m.p', 'rb'))
+xyzT_w_m   = pickle.load(open(tree_dir / 'xyzT_w_m.p', 'rb'))
 # the "f" below refers to flattened, which is the result of passing
 # a Boolean array like Maskr to an array.
 lonrf = G['lon_rho'][Maskr]
@@ -69,6 +73,12 @@ maskr = Maskr.flatten()
 # minimum grid sizes in degrees (assumes plaid lon,lat grid?)
 dxg = np.diff(G['lon_rho'][0,:]).min()
 dyg = np.diff(G['lat_rho'][:,0]).min()
+
+# jx: get center (lon, lat) of the domain
+x = G['lon_rho']
+x_c = np.mean(x)
+y = G['lat_rho']
+y_c = np.mean(y)
 
 def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
     """
@@ -109,9 +119,15 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
     
     # debugging
     vconst = False # set v to a constant, u and w to zero
-    jx = True # use Jilian's modification of the pcs step
-    average_W = True # average k neighbors of w in get_vel, such as k_nei=20, need this in high-resolution (10m) model
-    k_nei = 20
+    jx = True # use Jilian's modification of the pcs step and new 3D kdTree
+    if jx:
+        average_W = True # average k neighbors of w in get_vel, such as k_nei=20, need this in high-resolution (10m) model
+        k_nei = 20 
+        use_new_tree = True  # use a new 3D tree that has a unit of meter in 3D directions
+    else:
+        average_W = False
+        k_nei = 1
+        use_new_tree = False
     
     # Step through times.
     #
@@ -349,9 +365,9 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
             P['cs'][it0,:] = pcs
             
             for vn in tracer_list:
-                P[vn][it0,:] = get_VR(trf0_dict[vn], trf1_dict[vn], plon, plat, pcs, 0, surface)
+                P[vn][it0,:] = get_VR(trf0_dict[vn], trf1_dict[vn], plon, plat, pcs, 0, surface, use_new_tree,zf0,zf1,hf,x_c,y_c)
                 
-            V = get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon, plat, pcs, 0, surface, average_W, k_nei)
+            V = get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon, plat, pcs, 0, surface, use_new_tree,zf0,zf1,hf,x_c,y_c,average_W,k_nei)
             ZH = get_zh(zf0,zf1,hf, plon, plat, 0)
             P['u'][it0,:] = V[:,0]
             P['v'][it0,:] = V[:,1]
@@ -370,18 +386,18 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
             
             if TR['no_advection'] == False:
                 # RK4 integration
-                V0 = get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon, plat, pcs, fr0, surface, average_W, k_nei)
+                V0 = get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon, plat, pcs, fr0, surface, use_new_tree,zf0,zf1,hf,x_c,y_c,average_W,k_nei)
                 ZH0 = get_zh(zf0,zf1,hf, plon, plat, fr0)
                 if jx == False:
                     plon1, plat1, pcs1 = update_position(dxg, dyg, maskr, V0, ZH0, S, delt/2,
                                                         plon, plat, pcs, surface)
                 else:
                     plon1, plat1 = update_position_lonlat(dxg, dyg, maskr, V0, delt/2, plon, plat)
-                    ZH0_new = get_zh(zf0,zf1,hf, plon1, plat1, frmid)  #jilian: we could merge ZH0_new and ZH1 if not using update_position in the official version
+                    ZH0_new = get_zh(zf0,zf1,hf, plon1, plat1, frmid)  #jx: ZH0_new is the same as ZH1
                     pcs1 = update_position_z(V0, ZH0, ZH0_new, delt/2, pcs, surface)
                 
                 
-                V1 = get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon1, plat1, pcs1, frmid, surface, average_W, k_nei)
+                V1 = get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon1, plat1, pcs1, frmid, surface, use_new_tree,zf0,zf1,hf,x_c,y_c,average_W,k_nei)
                 ZH1 = get_zh(zf0,zf1,hf, plon1, plat1, frmid)
 
                 if jx == False:
@@ -389,11 +405,11 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
                                                         plon, plat, pcs, surface)
                 else:
                     plon2, plat2 = update_position_lonlat(dxg, dyg, maskr, V1, delt/2, plon, plat)
-                    ZH1_new = get_zh(zf0,zf1,hf, plon2, plat2, frmid)
+                    ZH1_new = get_zh(zf0,zf1,hf, plon2, plat2, frmid)  #jx: ZH1_new is the same as ZH2
                     pcs2 = update_position_z(V1, ZH1, ZH1_new, delt/2, pcs, surface)
                 
                 
-                V2 = get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon2, plat2, pcs2, frmid, surface, average_W, k_nei)
+                V2 = get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon2, plat2, pcs2, frmid, surface, use_new_tree,zf0,zf1,hf,x_c,y_c,average_W,k_nei)
                 ZH2 = get_zh(zf0,zf1,hf, plon2, plat2, frmid)
 
                 if jx == False:
@@ -401,11 +417,11 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
                                                         plon, plat, pcs, surface)
                 else:
                     plon3, plat3 = update_position_lonlat(dxg, dyg, maskr, V2, delt, plon, plat)
-                    ZH2_new = get_zh(zf0,zf1,hf, plon3, plat3, fr1)
+                    ZH2_new = get_zh(zf0,zf1,hf, plon3, plat3, fr1)  #jx: ZH2_new is the same as ZH3
                     pcs3 = update_position_z(V2, ZH2, ZH2_new, delt, pcs, surface)
                 
                 
-                V3 = get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon3, plat3, pcs3, fr1, surface, average_W, k_nei)
+                V3 = get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon3, plat3, pcs3, fr1, surface, use_new_tree,zf0,zf1,hf,x_c,y_c,average_W,k_nei)
                 ZH3 = get_zh(zf0,zf1,hf, plon3, plat3, fr1) # not needed?
                 
                 # add windage, calculated from the middle time
@@ -443,20 +459,19 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
                     plon, plat, pcs = update_position(dxg, dyg, maskr, (V0 + 2*V1 + 2*V2 + V3)/6 + Vwind3 + Vsink3 + Vstay3, (ZH0 + 2*ZH1 + 2*ZH2 + ZH3)/6, S, delt, plon, plat, pcs, surface)
                 else:
                     plon, plat = update_position_lonlat(dxg, dyg, maskr, (V0 + 2*V1 + 2*V2 + V3)/6 + Vwind3 + Vsink3 + Vstay3, delt, plon, plat)
-                    ZH_new = get_zh(zf0,zf1,hf, plon, plat, fr1)  # use fr1? yes I think so
+                    ZH_new = get_zh(zf0,zf1,hf, plon, plat, fr1)
                     pcs = update_position_z((V0 + 2*V1 + 2*V2 + V3)/6 + Vwind3 + Vsink3 + Vstay3,
-                                            ZH0,
-                                            ZH_new, delt, pcs, surface)
+                                            ZH0, ZH_new, delt, pcs, surface)
                 
                 
             elif TR['no_advection'] == True:
                 V3 = np.zeros((NP,3))
-                ZH3 = get_zh(zf0,zf1,hf, plon, plat, frmid)  #jilian: may not need this? should it be ZH3 = get_zh(zf0,zf1,hf, plon, plat, fr1)?
+                ZH3 = get_zh(zf0,zf1,hf, plon, plat, frmid)  #jx: may not need this? should it be ZH3 = get_zh(zf0,zf1,hf, plon, plat, fr1)?
                                               
             # add turbulence to vertical position change (advection already added above)
             if turb == True:
                 # pull values of VdAKs and add up to 3-dimensions
-                VdAKs = get_dAKs_new(dKdzf0, dKdzf1, plon, plat, pcs, frmid)
+                VdAKs = get_dAKs_new(dKdzf0, dKdzf1, plon, plat, pcs, frmid, use_new_tree,zf0,zf1,hf,x_c,y_c)
                 VdAKs3 = np.zeros((NP,3))
                 VdAKs3[:,2] = VdAKs
                 # update position advecting vertically with 1/2 of AKs gradient
@@ -464,9 +479,9 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
                 #plon_junk, plat_junk, pcs_half = update_position(dxg, dyg, maskr,
                 #                VdAKs3/2, ZH, S, delt/2, plon, plat, pcs, surface)
                 #pcs_half = update_position_z(VdAKs3/2, ZH, ZH, delt/2, pcs, surface)  #jx
-                pcs_half = update_position_z(VdAKs3, ZH, ZH, delt/2, pcs, surface)
+                pcs_half = update_position_z(VdAKs3, ZH, ZH, delt/2, pcs, surface)  #jx
                 # get AKs at this height, and thence the turbulent perturbation velocity
-                Vturb = get_turb(VdAKs, AKsf0, AKsf1, delt, plon, plat, pcs_half, frmid)
+                Vturb = get_turb(VdAKs, AKsf0, AKsf1, delt, plon, plat, pcs_half, frmid, use_new_tree,zf0,zf1,hf,x_c,y_c)
                 Vturb3 = np.zeros((NP,3))
                 Vturb3[:,2] = Vturb
                 # update vertical position for real
@@ -474,7 +489,7 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
                     plon_junk, plat_junk, pcs = update_position(dxg, dyg, maskr, Vturb3, ZH, S, delt,
                                                         plon, plat, pcs, surface)
                 else:
-                    ZH_new = get_zh(zf0,zf1,hf, plon, plat, fr1)  #jx: need this if testing no advection; ZH_new, ZH3, and ZH2_new are the same. we can do some housekeeping
+                    ZH_new = get_zh(zf0,zf1,hf, plon, plat, fr1)  #jx: need this if testing no advection; ZH_new, ZH3, and ZH2_new are the same.
                     pcs = update_position_z(Vturb3, ZH_new, ZH_new, delt, pcs, surface)  #jx
 
             ihr = nd + 1 # number of fractions 1/ndiv into the hour
@@ -489,9 +504,9 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
                 P['cs'][it1,:] = pcs
                 
                 for vn in tracer_list:
-                    P[vn][it1,:] = get_VR(trf0_dict[vn], trf1_dict[vn], plon, plat, pcs, fr1, surface)
+                    P[vn][it1,:] = get_VR(trf0_dict[vn], trf1_dict[vn], plon, plat, pcs, fr1, surface, use_new_tree,zf0,zf1,hf,x_c,y_c)
 
-                V_save = get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon, plat, pcs, 0, surface, average_W, k_nei)
+                V_save = get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon, plat, pcs, fr1, surface, use_new_tree,zf0,zf1,hf,x_c,y_c,average_W,k_nei)
                 P['u'][it1,:] = V_save[:,0]
                 P['v'][it1,:] = V_save[:,1]
                 P['w'][it1,:] = V_save[:,2] # average of k neighbors
@@ -513,7 +528,7 @@ def get_tracks(fn_list, plon0, plat0, pcs0, TR, trim_loc=False):
 
     return P
 
-def update_position_lonlat(dxg, dyg, maskr, V, dt_sec, plon, plat):
+def update_position_lonlat(dxg, dyg, maskr, V, dt_sec, plon, plat):   #jx
     # find the new position
     Plon = plon.copy()
     Plat = plat.copy()
@@ -554,7 +569,7 @@ def update_position_lonlat(dxg, dyg, maskr, V, dt_sec, plon, plat):
         Plat[pcond] = Plat_NEW[pcond]
     return Plon, Plat
 
-def update_position_z(V, ZH0, ZH1, dt_sec, pcs0, surface):
+def update_position_z(V, ZH0, ZH1, dt_sec, pcs0, surface):   #jx
     # find the new position in the vertical
     Pcs = pcs0.copy()
     # vertical particle displacement
@@ -672,7 +687,7 @@ def update_position(dxg, dyg, maskr, V, ZH, S, dt_sec, plon, plat, pcs, surface)
 
     return Plon, Plat, Pcs
 
-def get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon, plat, pcs, frac, surface, average_W, k_nei):
+def get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon, plat, pcs, frac, surface, use_new_tree,zf0,zf1,hf,x_c,y_c,average_W,k_nei):
     # Get the velocity at all points, at an arbitrary time between two saves
     # "frac" is the fraction of the way between the times of ds0 and ds1, 0 <= frac <= 1.
     # NOTE: with ndiv=1 this gets called 4 times per hour, or 96 times per day.
@@ -690,21 +705,42 @@ def get_vel(uf0,uf1,vf0,vf1,wf0,wf1, plon, plat, pcs, frac, surface, average_W, 
         V[:,0] = ui
         V[:,1] = vi
     else:
-        xys = np.array((plon,plat,pcs)).T
-        ui0 = uf0[xyzT_u.query(xys, workers=-1)[1]]
-        vi0 = vf0[xyzT_v.query(xys, workers=-1)[1]]
-        if average_W:  # average of k_nei neighbors
-            wi0tmp = wf0[xyzT_w.query(xys, k=k_nei, workers=-1)[1]]
-            wi0 = wi0tmp.mean(axis=1)
+        if use_new_tree:
+            ZH = get_zh(zf0,zf1,hf, plon, plat, frac)
+            #pcs_m = ZH.sum(axis=1) * pcs # 
+            pcs_m = ZH[:,1] * pcs # in meter 
+            plon_m, plat_m = zfun.ll2xy(plon, plat, x_c, y_c) # in meter
+            xys_m = np.array((plon_m,plat_m,pcs_m)).T
+            ui0 = uf0[xyzT_u_m.query(xys_m, workers=-1)[1]]
+            vi0 = vf0[xyzT_v_m.query(xys_m, workers=-1)[1]]
+            if average_W:
+                wi0tmp = wf0[xyzT_w_m.query(xys_m, k=k_nei, workers=-1)[1]]
+                if k_nei==1:
+                    wi0 = wi0tmp.mean()
+                else:
+                    wi0 = wi0tmp.mean(axis=1)
+            else:
+                wi0 = wf0[xyzT_w_m.query(xys_m, workers=-1)[1]]
+            ui1 = uf1[xyzT_u_m.query(xys_m, workers=-1)[1]]
+            vi1 = vf1[xyzT_v_m.query(xys_m, workers=-1)[1]]
+            if average_W:
+                wi1tmp = wf1[xyzT_w_m.query(xys_m, k=k_nei, workers=-1)[1]]
+                if k_nei==1:
+                    wi1 = wi1tmp.mean()
+                else:    
+                    wi1 = wi1tmp.mean(axis=1)
+            else:
+                wi1 = wf1[xyzT_w_m.query(xys_m, workers=-1)[1]]
+        
         else:
+            xys = np.array((plon,plat,pcs)).T
+            ui0 = uf0[xyzT_u.query(xys, workers=-1)[1]]
+            vi0 = vf0[xyzT_v.query(xys, workers=-1)[1]]
             wi0 = wf0[xyzT_w.query(xys, workers=-1)[1]]
-        ui1 = uf1[xyzT_u.query(xys, workers=-1)[1]]
-        vi1 = vf1[xyzT_v.query(xys, workers=-1)[1]]
-        if average_W:
-            wi1tmp = wf1[xyzT_w.query(xys, k=k_nei, workers=-1)[1]]
-            wi1 = wi1tmp.mean(axis=1)
-        else:
+            ui1 = uf1[xyzT_u.query(xys, workers=-1)[1]]
+            vi1 = vf1[xyzT_v.query(xys, workers=-1)[1]]
             wi1 = wf1[xyzT_w.query(xys, workers=-1)[1]]
+            
         ui = (1 - frac)*ui0 + frac*ui1
         vi = (1 - frac)*vi0 + frac*vi1
         wi = (1 - frac)*wi0 + frac*wi1
@@ -728,16 +764,25 @@ def get_zh(zf0,zf1,hf, plon, plat, frac):
     ZH[:,1] = hi
     return ZH
     
-def get_VR(tf0,tf1, plon, plat, pcs, frac, surface):
+def get_VR(tf0,tf1, plon, plat, pcs, frac, surface, use_new_tree,zf0,zf1,hf,x_c,y_c):
     # Get a variable on the z_rho grid at all points.
     if surface == True:
         xy = np.array((plon,plat)).T
         ti0 = tf0[xyT_rho.query(xy, workers=-1)[1]]
         ti1 = tf1[xyT_rho.query(xy, workers=-1)[1]]
     else:
-        xys = np.array((plon,plat,pcs)).T
-        ti0 = tf0[xyzT_rho.query(xys, workers=-1)[1]]
-        ti1 = tf1[xyzT_rho.query(xys, workers=-1)[1]]
+        if use_new_tree:
+            ZH = get_zh(zf0,zf1,hf, plon, plat, frac)
+            #pcs_m = ZH.sum(axis=1) * pcs
+            pcs_m = ZH[:,1] * pcs # in meter
+            plon_m, plat_m = zfun.ll2xy(plon, plat, x_c, y_c) # in meter
+            xys_m = np.array((plon_m,plat_m,pcs_m)).T
+            ti0 = tf0[xyzT_rho_m.query(xys_m, workers=-1)[1]]
+            ti1 = tf1[xyzT_rho_m.query(xys_m, workers=-1)[1]]
+        else:
+            xys = np.array((plon,plat,pcs)).T
+            ti0 = tf0[xyzT_rho.query(xys, workers=-1)[1]]
+            ti1 = tf1[xyzT_rho.query(xys, workers=-1)[1]]
     ti = (1 - frac)*ti0 + frac*ti1
     return ti
     
@@ -756,23 +801,41 @@ def get_wind(Uwindf0, Uwindf1, Vwindf0, Vwindf1, plon, plat, frac, windage):
     Vwind3[:,1] = windage*Vwind
     return Vwind3
     
-def get_AKs(AKsf, plon, plat, pcs):
+def get_AKs(AKsf, plon, plat, pcs, frac, use_new_tree,zf0,zf1,hf,x_c,y_c):
     # Get AKs at all points, at one time.
-    xys = np.array((plon,plat,pcs)).T
-    AKsi = AKsf[xyzT_w.query(xys, workers=-1)[1]]
+    if use_new_tree:
+        ZH = get_zh(zf0,zf1,hf, plon, plat, frac)
+        #pcs_m = ZH.sum(axis=1) * pcs
+        pcs_m = ZH[:,1] * pcs #
+        plon_m, plat_m = zfun.ll2xy(plon, plat, x_c, y_c) # in meter
+        xys_m = np.array((plon_m,plat_m,pcs_m)).T
+        AKsi = AKsf[xyzT_w_m.query(xys_m, workers=-1)[1]]
+    else:
+        xys = np.array((plon,plat,pcs)).T
+        AKsi = AKsf[xyzT_w.query(xys, workers=-1)[1]]
     return AKsi
     
-def get_dAKs_new(dKdzf0, dKdzf1, plon, plat, pcs, frac):
-    xys = np.array((plon,plat,pcs)).T
-    dKdzi0 = dKdzf0[xyzT_rho.query(xys, workers=-1)[1]]
-    dKdzi1 = dKdzf1[xyzT_rho.query(xys, workers=-1)[1]]
+def get_dAKs_new(dKdzf0, dKdzf1, plon, plat, pcs, frac, use_new_tree,zf0,zf1,hf,x_c,y_c):
+    if use_new_tree:
+        ZH = get_zh(zf0,zf1,hf, plon, plat, frac)
+        #pcs_m = ZH.sum(axis=1) * pcs #
+        pcs_m = ZH[:,1] * pcs #
+        plon_m, plat_m = zfun.ll2xy(plon, plat, x_c, y_c) # in meter
+        xys_m = np.array((plon_m,plat_m,pcs_m)).T
+        dKdzi0 = dKdzf0[xyzT_rho_m.query(xys_m, workers=-1)[1]]
+        dKdzi1 = dKdzf1[xyzT_rho_m.query(xys_m, workers=-1)[1]]
+    else:
+        xys = np.array((plon,plat,pcs)).T
+        dKdzi0 = dKdzf0[xyzT_rho.query(xys, workers=-1)[1]]
+        dKdzi1 = dKdzf1[xyzT_rho.query(xys, workers=-1)[1]]
+        
     dKdzi = (1 - frac)*dKdzi0 + frac*dKdzi1
     return dKdzi
 
-def get_turb(dAKs, AKsf0, AKsf1, delta_t, plon, plat, pcs, frac):
+def get_turb(dAKs, AKsf0, AKsf1, delta_t, plon, plat, pcs, frac, use_new_tree,zf0,zf1,hf,x_c,y_c):
     # get the vertical turbulence correction components
-    V0 = get_AKs(AKsf0, plon, plat, pcs)
-    V1 = get_AKs(AKsf1, plon, plat, pcs)
+    V0 = get_AKs(AKsf0, plon, plat, pcs, frac, use_new_tree,zf0,zf1,hf,x_c,y_c)
+    V1 = get_AKs(AKsf1, plon, plat, pcs, frac, use_new_tree,zf0,zf1,hf,x_c,y_c)
     # create weighted average diffusivity
     Vave = (1 - frac)*V0 + frac*V1
     # turbulence calculation from Banas, MacCready, and Hickey (2009)
