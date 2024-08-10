@@ -9,7 +9,7 @@
 * For simplicity, I put the river term into the shallow layer. It includes both river and wwtps. More strictly, the wwtps should be added to the deep layer
 * DO consumption in the shallow layer == nitrification + remineralization; while in the deep layer ==  nitrification + remineralization + SOD.
 
-##### LO_NPZD.pdf
-• NPZD structure in fennel.h with customization in LO
+#### LO_NPZD.pdf
+* NPZD structure in fennel.h with customization in LO
 
 
