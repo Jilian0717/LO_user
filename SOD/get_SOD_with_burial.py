@@ -10,7 +10,7 @@ import pandas as pd
 from time import time
 tt0 = time()
 
-burial=50%
+burial=50 # 50%
 
 #%------------------------------------------------
 Ldir = Lfun.Lstart()
