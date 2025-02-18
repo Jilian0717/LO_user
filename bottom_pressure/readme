@@ -1,1 +1,8 @@
 
+Three model versions being examined:
+
+• cas7_t0_x4b: current LiveOcean
+• cas6_v0_live: previous LiveOcean, likely being used to get the old model-data bottom pressure comparison
+• or2_t0_x0: a small domain model in the offshore of Oregon Coast.
+
+Hourly extractions at the four observation stations (CP01, CP015, CP02, and CP03) from the three models can be found in https://drive.google.com/drive/folders/1Yp3ApGdkc3yrPgH4C9ow1VGw2WnoKNtF?usp=sharing
