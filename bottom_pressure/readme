@@ -1,3 +1,4 @@
+Python code used to calculate bottom pressure anomaly from LiveOcean, and compare it with obs.
 
 Three model versions being examined:
 
